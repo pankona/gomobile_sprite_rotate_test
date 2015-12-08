@@ -31,6 +31,7 @@ package main
 import (
 	"image"
 	"log"
+	"math"
 	"time"
 
 	_ "image/jpeg"
@@ -40,6 +41,7 @@ import (
 	"golang.org/x/mobile/event/lifecycle"
 	"golang.org/x/mobile/event/paint"
 	"golang.org/x/mobile/event/size"
+	"golang.org/x/mobile/event/touch"
 	"golang.org/x/mobile/exp/app/debug"
 	"golang.org/x/mobile/exp/f32"
 	"golang.org/x/mobile/exp/gl/glutil"
@@ -55,6 +57,8 @@ var (
 	eng       sprite.Engine
 	scene     *sprite.Node
 	fps       *debug.FPS
+	degree    float32
+	affine    *f32.Affine
 )
 
 func main() {
@@ -79,9 +83,20 @@ func main() {
 				if glctx == nil || e.External {
 					continue
 				}
+				degree += 1
 				onPaint(glctx, sz)
 				a.Publish()
 				a.Send(paint.Event{}) // keep animating
+			case touch.Event:
+				/*
+					if e.Type == touch.TypeEnd {
+						fmt.Println(degree, affine)
+						degree += 90
+						for degree >= 360 {
+							degree -= 360
+						}
+					}
+				*/
 			}
 		}
 	})
@@ -128,10 +143,45 @@ func loadScene() {
 
 	n = newNode()
 	eng.SetSubTex(n, texs[texGopherR])
-	eng.SetTransform(n, f32.Affine{
-		{140, 0, 100},
-		{0, 90, 100},
+	sprite_w := float32(140) // sprite width
+	sprite_h := float32(90)  // sprite height
+	sprite_x := float32(200) // sprite x position
+	sprite_y := float32(200) // sprite y position
+	n.Arranger = arrangerFunc(func(eng sprite.Engine, n *sprite.Node, t clock.Time) {
+		radian := float32(degree) * math.Pi / 180
+
+		// initialize affine variable
+		affine = &f32.Affine{
+			{1, 0, 0},
+			{0, 1, 0},
+		}
+
+		// move to specified position
+		affine.Translate(affine, sprite_x, sprite_y)
+
+		// rotation
+		//myRotateBad(affine, radian, sprite_w, sprite_h)
+		myRotateGood(affine, radian, sprite_w, sprite_h)
+
+		// apply affine transformation
+		eng.SetTransform(n, *affine)
 	})
+}
+
+// bad rotation
+func myRotateBad(affine *f32.Affine, radian, sprite_w, sprite_h float32) {
+	affine.Translate(affine, 0.5, 0.5)
+	affine.Scale(affine, sprite_w, sprite_h)
+	affine.Rotate(affine, radian)
+	affine.Translate(affine, -0.5, -0.5)
+}
+
+// good rotation
+func myRotateGood(affine *f32.Affine, radian, sprite_w, sprite_h float32) {
+	affine.Translate(affine, 0.5, 0.5)
+	affine.Rotate(affine, radian)
+	affine.Scale(affine, sprite_w, sprite_h)
+	affine.Translate(affine, -0.5, -0.5)
 }
 
 const (
